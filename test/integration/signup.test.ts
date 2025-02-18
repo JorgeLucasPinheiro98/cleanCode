@@ -1,16 +1,22 @@
-import { AccountDAODatabase, AccountDAOMemory } from "../src/data";
-import GetAccount from "../src/getAccount";
-import Signup from "../src/signup";
+import { AccountRepositoryDatabase, AccountRepositoryMemory } from "../../src/infra/repository/AccountRepository";
+import DatabaseConnection, { PgPromiseAdapter } from "../../src/infra/database/DatabaseConnection";
+import GetAccount from "../../src/application/usecase/GetAccount";
+import Registry from "../../src/infra/di/Registry";
+import Signup from "../../src/application/usecase/signup";
 import sinon from "sinon";
 
+let databaseConnection: DatabaseConnection;
 let signup: Signup;
 let getAccount: GetAccount;
 
 beforeEach(() => {
-    const accountDAO = new AccountDAODatabase();
-    // const accountDAO = new AccountDAOMemory();
-    signup = new Signup(accountDAO);
-    getAccount = new GetAccount(accountDAO);
+    databaseConnection = new PgPromiseAdapter();
+    Registry.getInstance().provide("databaseConnection", databaseConnection);
+    const accountRepository = new AccountRepositoryDatabase();
+    // const accountRepository = new AccountRepositoryMemory();
+    Registry.getInstance().provide("accountRepository", accountRepository);
+    signup = new Signup();
+    getAccount = new GetAccount();
 });
 
 test("Deve fazer a criação da conta de um usuário do tipo passageiro", async function () {
@@ -122,16 +128,16 @@ test("Não deve fazer a criação da conta de um usuário se a placa for inváli
 
 
 test("Deve fazer a criação da conta de um usuário do tipo passageiro com stub", async function () {
-    const input = {
+    const input: any = {
         name: "John Doe",
         email: `john.doe${Math.random()}@gmail.com`,
         cpf: "97456321558",
         password: "asdQWE123",
         isPassenger: true
     };
-    const saveAccountStub = sinon.stub(AccountDAODatabase.prototype, "saveAccount").resolves();
-    const getAccountByEmailStub = sinon.stub(AccountDAODatabase.prototype, "getAccountByEmail").resolves();
-    const getAccountById = sinon.stub(AccountDAODatabase.prototype, "getAccountById").resolves(input);
+    const saveAccountStub = sinon.stub(AccountRepositoryDatabase.prototype, "saveAccount").resolves();
+    const getAccountByEmailStub = sinon.stub(AccountRepositoryDatabase.prototype, "getAccountByEmail").resolves();
+    const getAccountById = sinon.stub(AccountRepositoryDatabase.prototype, "getAccountById").resolves(input);
     const outputSignup = await signup.execute(input);
     expect(outputSignup.accountId).toBeDefined();
     const outputGetAccount = await getAccount.execute(outputSignup.accountId);
@@ -145,8 +151,8 @@ test("Deve fazer a criação da conta de um usuário do tipo passageiro com stub
 });
 
 test("Deve fazer a criação da conta de um usuário do tipo passageiro com spy", async function () {
-    const saveAccountSpy = sinon.spy(AccountDAODatabase.prototype, "saveAccount");
-    const getAccountByIdSpy = sinon.spy(AccountDAODatabase.prototype, "getAccountById");
+    const saveAccountSpy = sinon.spy(AccountRepositoryDatabase.prototype, "saveAccount");
+    const getAccountByIdSpy = sinon.spy(AccountRepositoryDatabase.prototype, "getAccountById");
     const input = {
         name: "John Doe",
         email: `john.doe${Math.random()}@gmail.com`,
@@ -175,25 +181,26 @@ test("Deve fazer a criação da conta de um usuário do tipo passageiro com mock
         password: "asdQWE123",
         isPassenger: true
     };
-    const accountDAOMock = sinon.mock(AccountDAODatabase.prototype);
-    accountDAOMock.expects("saveAccount").once().resolves();
-    accountDAOMock.expects("getAccountByEmail").once().resolves();
+    const accountRepositoryMock = sinon.mock(AccountRepositoryDatabase.prototype);
+    accountRepositoryMock.expects("saveAccount").once().resolves();
+    accountRepositoryMock.expects("getAccountByEmail").once().resolves();
     const outputSignup = await signup.execute(input);
     expect(outputSignup.accountId).toBeDefined();
-    accountDAOMock.expects("getAccountById").once().withArgs(outputSignup.accountId).resolves(input);
+    accountRepositoryMock.expects("getAccountById").once().withArgs(outputSignup.accountId).resolves(input);
     const outputGetAccount = await getAccount.execute(outputSignup.accountId);
     expect(outputGetAccount.name).toBe(input.name);
     expect(outputGetAccount.email).toBe(input.email);
     expect(outputGetAccount.cpf).toBe(input.cpf);
     expect(outputGetAccount.password).toBe(input.password);
-    accountDAOMock.verify();
-    accountDAOMock.restore();
+    accountRepositoryMock.verify();
+    accountRepositoryMock.restore();
 });
 
-test.only("Deve fazer a criação da conta de um usuário do tipo passageiro com fake", async function () {
-    const accountDAO = new AccountDAOMemory();
-    signup = new Signup(accountDAO);
-    getAccount = new GetAccount(accountDAO);
+test("Deve fazer a criação da conta de um usuário do tipo passageiro com fake", async function () {
+    const accountRepository = new AccountRepositoryMemory();
+    Registry.getInstance().provide("accountRepository", accountRepository);
+    signup = new Signup();
+    getAccount = new GetAccount();
     const input = {
         name: "John Doe",
         email: `john.doe${Math.random()}@gmail.com`,
@@ -208,4 +215,8 @@ test.only("Deve fazer a criação da conta de um usuário do tipo passageiro com
     expect(outputGetAccount.email).toBe(input.email);
     expect(outputGetAccount.cpf).toBe(input.cpf);
     expect(outputGetAccount.password).toBe(input.password);
+});
+
+afterEach(async () => {
+    await databaseConnection.close();
 });
