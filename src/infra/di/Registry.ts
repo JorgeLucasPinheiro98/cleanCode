@@ -11,7 +11,7 @@ export default class Registry {
     }
 
     inject (name: string) {
-        if (!this.dependencies[name]) throw new Error("Dependency not found");
+        if (!this.dependencies[name]) throw new Error(`Dependency not found ${name}`);
         return this.dependencies[name];
     }
 

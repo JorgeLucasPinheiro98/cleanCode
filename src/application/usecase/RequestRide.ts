@@ -17,7 +17,7 @@ export default class RequestRide {
         const ride = Ride.create(input.passengerId, input.fromLat, input.fromLong, input.toLat, input.toLong);
         await this.rideRepository.saveRide(ride);
         return {
-            rideId: ride.rideId
+            rideId: ride.getRideId()
         }
     }
 }

@@ -1,24 +1,34 @@
-import crypto from "crypto";
+import Position from "./Position";
+import DistanceCalculator from "./service/DistanceCalculator";
+import FareCalculator from "./service/FareCalculator";
+import Coord from "./vo/Coord";
+import UUID from "./vo/UUID";
 
 export default class Ride {
+    private rideId: UUID;
+    private passengerId: UUID;
+    private driverId?: UUID;
+    private from: Coord;
+    private to: Coord;
 
     constructor (
-        readonly rideId: string,
-        readonly passengerId: string,
-        readonly driverId: string | null,
-        readonly fromLat: number,
-        readonly fromLong: number,
-        readonly toLat: number,
-        readonly toLong: number,
-        readonly fare: number,
-        readonly distance: number,
-        readonly status: string,
+        rideId: string,
+        passengerId: string,
+        driverId: string | null,
+        fromLat: number,
+        fromLong: number,
+        toLat: number,
+        toLong: number,
+        private fare: number,
+        private distance: number,
+        private status: string,
         readonly date: Date
     ) {
-        if (fromLat < -90 || fromLat > 90) throw new Error("The latitude is invalid");
-        if (toLat < -90 || toLat > 90) throw new Error("The latitude is invalid");
-        if (fromLong < -180 || fromLong > 180) throw new Error("The longitude is invalid");
-        if (toLong < -180 || toLong > 180) throw new Error("The longitude is invalid");
+        this.rideId = new UUID(rideId);
+        this.passengerId = new UUID(passengerId);
+        if (driverId) this.driverId = new UUID(driverId);
+        this.from = new Coord(fromLat, fromLong);
+        this.to = new Coord(toLat, toLong);
     }
 
     static create (
@@ -28,7 +38,7 @@ export default class Ride {
         toLat: number,
         toLong: number
     ) {
-        const rideId = crypto.randomUUID();
+        const rideId = UUID.create().getValue();
         const status = "requested";
         const date = new Date();
         const fare = 0;
@@ -36,25 +46,63 @@ export default class Ride {
         return new Ride(rideId, passengerId, null, fromLat, fromLong, toLat, toLong, fare, distance, status, date);
     }
 
-    calculateDistance () {
-        const earthRadius = 6371;
-		const degreesToRadians = Math.PI / 180;
-		const deltaLat = (this.toLat - this.fromLat) * degreesToRadians;
-		const deltaLon = (this.toLong - this.fromLong) * degreesToRadians;
-		const a =
-			Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-			Math.cos(this.fromLat * degreesToRadians) *
-			Math.cos(this.toLat * degreesToRadians) *
-			Math.sin(deltaLon / 2) *
-			Math.sin(deltaLon / 2);
-		const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-		const distance = earthRadius * c;
-		return Math.round(distance);
+    getFrom () {
+        return this.from;
     }
 
-    calculateFare () {
-        const distance = this.calculateDistance();
-        return distance * 2.1;
+    getTo () {
+        return this.to;
+    }
+
+    getRideId () {
+        return this.rideId.getValue();
+    }
+
+    getPassengerId () {
+        return this.passengerId.getValue();
+    }
+
+    getDriverId () {
+        return this.driverId?.getValue();
+    }
+
+    setDriverId (driverId: string) {
+        this.driverId = new UUID(driverId);
+    }
+
+    setStatus (status: string) {
+        this.status = status;
+    }
+
+    getStatus () {
+        return this.status;
+    }
+
+    accept (driverId: string) {
+        if (this.status !== "requested") throw new Error("Invalid status");
+        this.status = "accepted";
+        this.setDriverId(driverId);
+    }
+
+    start () {
+        if (this.status !== "accepted") throw new Error("Invalid Status");
+        this.status = "in_progress";
+    }
+
+    getFare () {
+        return this.fare;
+    }
+
+    setFare (fare: number) {
+        this.fare = fare;
+    }
+
+    getDistance () {
+        return this.distance;
+    }
+
+    setDistance (distance: number) {
+        this.distance = distance;
     }
 
 }
